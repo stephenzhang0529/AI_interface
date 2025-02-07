@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-from sympy.physics.units import temperature
 
 # 设置API的URL和密钥
 DEEPSEEK_API_URL = "https://api.siliconflow.cn/v1/chat/completions"
