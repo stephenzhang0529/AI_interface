@@ -1,9 +1,24 @@
 import streamlit as st
 import requests
+import json
+import os
 
 # 设置API的URL和密钥
 DEEPSEEK_API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 DEEPSEEK_API_KEY = "sk-udnaeovaprogkphwacdfxgypeswdwbnniijoxzrqyhjnhnjs"
+
+# 读取历史记录
+def load_chat_history():
+    history_file = 'chat_history.json'
+    if os.path.exists(history_file):
+        with open(history_file, 'r') as f:
+            return json.load(f)
+    return []
+
+# 保存聊天记录
+def save_chat_history(messages):
+    with open('chat_history.json', 'w') as f:
+        json.dump(messages, f)
 
 def asktoai(input_data,option,max_token,temper):
     headers = {
@@ -51,9 +66,25 @@ model=st.selectbox(
     placeholder="Select one model...",
 )
 # 输入参数
-max_token=st.slider("max_token:", 1, 8192, 512)
-temper=st.slider("max_token:", 0.0,2.0, value=0.7)
+max_token=st.slider("Max_token:", 1, 8192, 512)
+temper=st.slider("Temperature:", 0.0,2.0, value=0.7)
 input_data = st.chat_input("Say Something")
+
+# 初始化会话状态中的聊天记录
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+# 显示聊天记录
+flag=1
+for historymessage in st.session_state.messages:
+    if flag%2==1:
+        user_mess = st.chat_message("human")
+        user_mess.write(historymessage)
+        flag+=1
+    else:
+        ai_mess = st.chat_message("ai")
+        ai_mess.markdown(historymessage)
+        flag += 1
+
 
 if input_data:
     user_mess=st.chat_message("human")
@@ -63,3 +94,14 @@ if input_data:
     ai_mess = st.chat_message("ai")
     ai_mess.markdown(ai_response)
 
+    # 将用户输入和AI回应保存到历史记录
+    st.session_state.messages.append(input_data)
+    st.session_state.messages.append(ai_response)
+
+# 添加保存聊天记录的按钮
+if st.button("保存聊天记录"):
+    save_chat_history(st.session_state.messages)  # 保存聊天记录到本地
+    st.success("聊天记录已保存！")
+    # 清空当前聊天记录并刷新页面
+    st.session_state.messages = []
+    st.rerun()  # 刷新页面，显示空白的聊天界面

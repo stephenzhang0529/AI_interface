@@ -95,10 +95,11 @@ model=st.selectbox(
      "black-forest-labs/FLUX.1-pro"),
     placeholder="Select one model...",
 )
+
 if model in ("stabilityai/stable-diffusion-3-5-large","stabilityai/stable-diffusion-3-5-large-turbo"):
     # stability models
     # number of generated photos
-    batch_size=st.slider("number of generated photo(s) per time:", 1, 4, 1)
+    batch_size=st.slider("Number of generated photo(s) per time:", 1, 4, 1)
     guidance_scale=st.slider("The match of prompt:", 0, 20, 7)
     image_size=st.selectbox(
     "The scale of photo:",
