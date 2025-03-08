@@ -43,6 +43,7 @@ def asktoai(input_data,option,max_token,temper):
         "n": 1,  # 返回结果的数量
         "response_format": {"type": "text"},  # 响应格式
     }
+    # 发送POST请求
     with st.spinner("AI is thinking..."):
        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
 
