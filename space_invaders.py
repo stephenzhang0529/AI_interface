@@ -34,6 +34,25 @@ with st.sidebar:
     st.title("🚀 Space Invaders 🚀")
     st.markdown("---")
 
+    with st.expander("游戏说明 (Instructions)", expanded=False):
+        st.markdown("""
+            ### 游戏规则：
+            - 使用键盘的左右箭头键 (或 A/D 键) 移动你的飞船。
+            - 使用空格键发射子弹。
+            - 击中外星人获得分数。
+            - 避免被外星人击中或让外星人到达你的防线。
+            - 每消灭一波外星人，下一波移动速度会增加，你的得分奖励也会增加。
+
+            ### 控制 (Controls)：
+            - **← / A** : 向左移动 (Move Left)
+            - **→ / D** : 向右移动 (Move Right)
+            - **空格键 (Spacebar)** : 发射子弹 (Shoot)
+            - **Enter (游戏结束后)**: 在游戏画面内重新开始 (Restart game within canvas after Game Over)
+
+            *提示: 点击游戏区域以确保键盘输入被捕获。*
+            """)
+    st.markdown("---")
+
     st.subheader("📊 游戏状态 (Game Status)")
     # Use columns for a slightly more compact layout in the sidebar
     col1_metric, col2_metric, col3_metric = st.columns(3)
@@ -62,25 +81,7 @@ with st.sidebar:
                 st.session_state.high_score = st.session_state.score
                 save_high_score(st.session_state.high_score)
             st.rerun()
-    st.markdown("---")
 
-    with st.expander("游戏说明 (Instructions)", expanded=False):
-        st.markdown("""
-        ### 游戏规则：
-        - 使用键盘的左右箭头键 (或 A/D 键) 移动你的飞船。
-        - 使用空格键发射子弹。
-        - 击中外星人获得分数。
-        - 避免被外星人击中或让外星人到达你的防线。
-        - 每消灭一波外星人，下一波移动速度会增加，你的得分奖励也会增加。
-
-        ### 控制 (Controls)：
-        - **← / A** : 向左移动 (Move Left)
-        - **→ / D** : 向右移动 (Move Right)
-        - **空格键 (Spacebar)** : 发射子弹 (Shoot)
-        - **Enter (游戏结束后)**: 在游戏画面内重新开始 (Restart game within canvas after Game Over)
-
-        *提示: 点击游戏区域以确保键盘输入被捕获。*
-        """)
 
 # --- Main Game Area ---
 game_column = st.container()

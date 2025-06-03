@@ -125,8 +125,6 @@ def generate_image_from_keywords(keywords_prompt):
                 st.error("API成功返回，但响应中未找到预期的 'data' 列表。")
                 st.json(ai_image_data)
 
-        except requests.exceptions.Timeout:
-            st.error("图像生成API请求超时。")
         except requests.exceptions.RequestException as e:
             st.error(f"图像生成API调用失败: {e}")
             if hasattr(e, 'response') and e.response is not None:
