@@ -5,6 +5,7 @@ nav = {
         st.Page("llm.py", title="LLM"),
         st.Page("vlm.py", title="VLM"),
         st.Page("word_image.py", title="WORD TO IMAGE"),
+        st.Page("mcp.py", title="MCP"),
         st.Page("space_invaders.py", title="SPACE INVADERS"),
         st.Page("about.py", title="ABOUT"),
     ],
