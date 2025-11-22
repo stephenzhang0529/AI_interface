@@ -5,7 +5,7 @@ import os # Added for environment variable access
 # --- Configuration ---
 DEEPSEEK_API_URL = "https://api.siliconflow.cn/v1/images/generations"
 # Prefer environment variable for API key, fallback to hardcoded for development
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-udnaeovaprogkphwacdfxgypeswdwbnniijoxzrqyhjnhnjs")
+DEEPSEEK_API_KEY = os.environ["API_KEY"]
 
 # --- API Call Functions ---
 def asktostabilityai(model_selected, current_prompt, batch_size_val, guidance_scale_val, image_size_val):

@@ -8,7 +8,7 @@ DEEPSEEK_CHAT_API_URL = "https://api.siliconflow.cn/v1/chat/completions" # For k
 DEEPSEEK_IMAGE_API_URL = "https://api.siliconflow.cn/v1/images/generations"  # For image generation
 
 # Prefer environment variable for API key
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-udnaeovaprogkphwacdfxgypeswdwbnniijoxzrqyhjnhnjs") # Ensure this key works for both APIs
+DEEPSEEK_API_KEY = os.environ["API_KEY"]
 
 # --- Hardcoded Model Identifiers and Parameters ---
 POEM_ANALYSIS_MODEL_ID = "deepseek-ai/DeepSeek-R1"

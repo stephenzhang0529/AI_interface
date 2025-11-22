@@ -5,7 +5,7 @@ import os
 
 # --- Configuration ---
 DEEPSEEK_API_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-udnaeovaprogkphwacdfxgypeswdwbnniijoxzrqyhjnhnjs")
+DEEPSEEK_API_KEY = os.environ["API_KEY"]
 
 # Mapping from user-friendly display names to actual VLM model identifiers for the API
 # Ensure these actual model identifiers are exactly what the SiliconFlow API expects.

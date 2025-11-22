@@ -1,8 +1,24 @@
 import streamlit as st
 import json
-import os  # Not strictly needed for this version but good practice for file paths
+import os
+import database # Import your database module
 
-# 设置页面配置
+# --- Placeholder for User Login (In a real app, this would come from an actual login) ---
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = 1 # Default to a user ID for testing. You might want to register a user first.
+    st.session_state.username = "GuestPlayer" # Default username for testing
+
+# To make the leaderboard functional, ensure user_id and username are set after login.
+# Example:
+# if st.session_state.get('logged_in_user'):
+#     st.session_state.user_id = st.session_state.logged_in_user['id']
+#     st.session_state.username = st.session_state.logged_in_user['username']
+# else:
+#     st.session_state.user_id = None # Or redirect to login page
+#     st.session_state.username = None
+
+
+# Set page configuration
 st.set_page_config(page_title="Space Invaders", layout="wide", initial_sidebar_state="expanded")
 
 # --- Game State Management ---
@@ -10,29 +26,20 @@ if 'game_active' not in st.session_state:
     st.session_state.game_active = False
 if 'score' not in st.session_state:
     st.session_state.score = 0
-if 'high_score' not in st.session_state:
-    # Try to load high score from a file, otherwise default to 0
-    try:
-        with open("highscore.json", "r") as f:
-            st.session_state.high_score = json.load(f).get("high_score", 0)
-    except (FileNotFoundError, json.JSONDecodeError):
-        st.session_state.high_score = 0
 if 'lives' not in st.session_state:
     st.session_state.lives = 3
-
-
-def save_high_score(score_to_save):
-    try:
-        with open("highscore.json", "w") as f:
-            json.dump({"high_score": score_to_save}, f)
-    except IOError:
-        st.warning("无法保存最高分。(Could not save high score.)")
-
+# High score is now handled by the database for the current user (if logged in) or globally for the game type
+# Removed 'high_score' from session_state as it's fetched from DB or calculated
 
 # --- Sidebar ---
 with st.sidebar:
     st.title("🚀 Space Invaders 🚀")
     st.markdown("---")
+
+    if st.session_state.user_id:
+        st.write(f"欢迎, **{st.session_state.username}**!")
+    else:
+        st.warning("请登录以保存您的分数并查看排行榜。")
 
     with st.expander("游戏说明 (Instructions)", expanded=False):
         st.markdown("""
@@ -54,33 +61,45 @@ with st.sidebar:
     st.markdown("---")
 
     st.subheader("📊 游戏状态 (Game Status)")
-    # Use columns for a slightly more compact layout in the sidebar
-    col1_metric, col2_metric, col3_metric = st.columns(3)
+    col1_metric, col2_metric = st.columns(2)
     with col1_metric:
         st.metric("分数", st.session_state.score)
     with col2_metric:
-        st.metric("最高分", st.session_state.high_score)
-    with col3_metric:
         st.metric("生命", "❤️" * st.session_state.lives if st.session_state.lives > 0 else "💔")
 
     st.markdown("---")
 
     if not st.session_state.game_active:
         if st.button("开始游戏 (Start Game)", key="start_game_button", type="primary", use_container_width=True):
-            st.session_state.game_active = True
-            st.session_state.score = 0
-            st.session_state.lives = 3  # Reset lives on new game
-            # Clear any previous game data from JS component if it exists from a previous run
-            if "game_component_data" in st.session_state:
-                del st.session_state.game_component_data
-            st.rerun()
+            if st.session_state.user_id: # Only allow starting if a user is identified
+                st.session_state.game_active = True
+                st.session_state.score = 0
+                st.session_state.lives = 3
+                if "game_component_data" in st.session_state:
+                    del st.session_state.game_component_data
+                st.rerun()
+            else:
+                st.warning("请先登录才能开始游戏！")
     else:
         if st.button("结束游戏 (End Game)", key="end_game_button", type="secondary", use_container_width=True):
             st.session_state.game_active = False
-            if st.session_state.score > st.session_state.high_score:
-                st.session_state.high_score = st.session_state.score
-                save_high_score(st.session_state.high_score)
+            # Save score when game ends
+            if st.session_state.user_id:
+                database.save_game_score(st.session_state.user_id, "Space Invaders", st.session_state.score)
+                st.toast(f"分数 {st.session_state.score} 已保存!", icon="💾")
             st.rerun()
+
+    st.markdown("---")
+    st.subheader("🏆 排行榜 (Leaderboard)")
+    if st.session_state.user_id:
+        leaderboard_data = database.get_leaderboard("Space Invaders", limit=5)
+        if leaderboard_data:
+            for i, entry in enumerate(leaderboard_data):
+                st.write(f"**{i+1}. {entry['username']}** - {entry['score']}")
+        else:
+            st.info("还没有分数。成为第一个！")
+    else:
+        st.info("登录后查看排行榜。")
 
 
 # --- Main Game Area ---
@@ -106,14 +125,14 @@ with game_column:
                     justify-content: center;
                     align-items: center;
                     background-color: #333; /* Dark background for iframe if canvas doesn't fill */
-                    min-height: 100vh; 
+                    min-height: 100vh;
                 }}
                 #gameCanvas {{
-                    border: 2px solid #6c757d; 
+                    border: 2px solid #6c757d;
                     background-color: black;
                     display: block; /* Remove extra space below canvas */
                     /* margin: 10px auto; Removed margin to let flexbox center */
-                    touch-action: none; 
+                    touch-action: none;
                 }}
             </style>
         </head>
@@ -123,8 +142,8 @@ with game_column:
                 const canvas = document.getElementById('gameCanvas');
                 const ctx = canvas.getContext('2d');
 
-                let score = {initial_score_py}; 
-                let lives = {initial_lives_py}; 
+                let score = {initial_score_py};
+                let lives = {initial_lives_py};
                 let gameOver = false;
                 let gameOverSentToPython = false; // Flag to send game over state only once
 
@@ -138,11 +157,11 @@ with game_column:
 
                 const player = {{
                     x: canvas.width / 2 - 25,
-                    y: canvas.height - 70, 
+                    y: canvas.height - 70,
                     width: 50,
                     height: 30,
-                    speed: 8, 
-                    color: '#28a745', 
+                    speed: 8,
+                    color: '#28a745',
                     isMovingLeft: false,
                     isMovingRight: false,
                     shootCooldown: 0,
@@ -155,13 +174,13 @@ with game_column:
                 const bulletHeight = 12;
 
                 let aliens = [];
-                const alienRowsDefault = 4; 
-                const alienColsDefault = 8; 
+                const alienRowsDefault = 4;
+                const alienColsDefault = 8;
                 let alienRows = alienRowsDefault;
                 let alienCols = alienColsDefault;
                 const alienWidth = 38; // Slightly smaller
                 const alienHeight = 28;
-                const alienPadding = 12; 
+                const alienPadding = 12;
                 let alienDirection = 1;
                 let baseAlienSpeed = 0.4; // Base speed
                 let alienSpeed = baseAlienSpeed;
@@ -197,7 +216,7 @@ with game_column:
                     if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') player.isMovingRight = true;
 
                     if (e.key === ' ' && !gameOver && player.shootCooldown <= 0) {{
-                        e.preventDefault(); 
+                        e.preventDefault();
                         bullets.push({{
                             x: player.x + player.width / 2 - bulletWidth / 2,
                             y: player.y, width: bulletWidth, height: bulletHeight, color: '#FFFFFF'
@@ -216,7 +235,7 @@ with game_column:
 
                 function resetGame() {{
                     score = 0;
-                    lives = 3; 
+                    lives = 3;
                     level = 1;
                     gameOver = false;
                     gameOverSentToPython = false; // Reset this flag
@@ -225,7 +244,7 @@ with game_column:
                     bullets = [];
                     initAliens();
                     sendDataToStreamlit({{ score: score, lives: lives, gameOver: gameOver, level: level }});
-                    requestAnimationFrame(gameLoop); 
+                    requestAnimationFrame(gameLoop);
                 }}
 
                 function checkCollision(rect1, rect2) {{
@@ -269,7 +288,7 @@ with game_column:
                              sendDataToStreamlit({{ score: score, lives: lives, gameOver: true, level: level }});
                              gameOverSentToPython = true;
                         }}
-                        return; 
+                        return;
                     }}
 
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -293,12 +312,12 @@ with game_column:
                             if (alien.alive && checkCollision(bullet, alien)) {{
                                 alien.alive = false;
                                 bullets.splice(i, 1);
-                                score += 10 * level; 
+                                score += 10 * level;
                                 if (aliens.every(a => !a.alive)) {{
                                     level++;
-                                    initAliens(); 
+                                    initAliens();
                                 }}
-                                break; 
+                                break;
                             }}
                         }}
                     }}
@@ -321,12 +340,12 @@ with game_column:
                         for (const alien of aliens) {{
                             if (alien.alive) {{
                                 alien.y += alienHeight / 1.5; // Move down a bit more
-                                 if (alien.y + alien.height >= player.y - 5) {{ 
+                                 if (alien.y + alien.height >= player.y - 5) {{
                                     lives = 0; gameOver = true; break;
                                 }}
                             }}
                         }}
-                    }} 
+                    }}
 
                     if(advanceAliens && !gameOver) {{ // Only move horizontally if not moving down and not game over
                          for (const alien of aliens) {{
@@ -342,11 +361,11 @@ with game_column:
                             if (checkCollision(alien, player)) {{
                                 lives--;
                                 if (lives <= 0) {{ lives = 0; gameOver = true; }}
-                                else {{ 
+                                else {{
                                     player.x = canvas.width / 2 - player.width / 2;
                                     initAliens(); // Reset wave on player hit
                                 }}
-                                break; 
+                                break;
                             }}
                         }}
                     }}
@@ -369,16 +388,17 @@ with game_column:
                     requestAnimationFrame(gameLoop);
                 }}
 
-                canvas.setAttribute('tabindex', '0'); 
-                canvas.focus(); 
+                canvas.setAttribute('tabindex', '0');
+                canvas.focus();
 
                 sendDataToStreamlit({{ score: score, lives: lives, gameOver: gameOver, level: level }}); // Initial data send
-                requestAnimationFrame(gameLoop); 
+                requestAnimationFrame(gameLoop);
             </script>
         </body>
         </html>
         """
 
+        # Removed 'key' argument here
         game_data_from_js = st.components.v1.html(game_html, height=620, scrolling=False)
 
         if game_data_from_js:  # This will be None until JS sends data
@@ -399,9 +419,9 @@ with game_column:
                 if js_game_over and st.session_state.game_active:  # Game ended in JS
                     st.toast(f"游戏结束! 最终得分: {st.session_state.score}", icon="🏁")
                     st.session_state.game_active = False
-                    if st.session_state.score > st.session_state.high_score:
-                        st.session_state.high_score = st.session_state.score
-                        save_high_score(st.session_state.high_score)
+                    if st.session_state.user_id: # Save score only if user is logged in
+                        database.save_game_score(st.session_state.user_id, "Space Invaders", st.session_state.score)
+                        st.toast(f"分数 {st.session_state.score} 已保存!", icon="💾")
                     should_rerun_for_game_over = True
 
                 if should_rerun_for_game_over:

@@ -2,11 +2,13 @@ import streamlit as st
 import requests
 import json
 import os
+import authenticator as auth
+import database # Import the database module
 
 # --- Configuration ---
 DEEPSEEK_API_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-udnaeovaprogkphwacdfxgypeswdwbnniijoxzrqyhjnhnjs")
-CHAT_HISTORY_FILE = 'chat_history.json'
+DEEPSEEK_API_KEY = os.environ["API_KEY"]
+# CHAT_HISTORY_FILE = 'chat_history.json' # No longer needed for file-based saving
 
 # Mapping from user-friendly display names to actual model identifiers for the API
 MODEL_PREFIX = "deepseek-ai/"
@@ -18,24 +20,24 @@ MODEL_OPTIONS_MAP = {
 }
 
 
-# --- Helper Functions ---
-def load_chat_history():
-    if os.path.exists(CHAT_HISTORY_FILE):
-        try:
-            with open(CHAT_HISTORY_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            st.error(f"Error reading chat history file '{CHAT_HISTORY_FILE}'. File might be corrupted.")
-            return []
-    return []
+# --- Helper Functions (removed file-based load/save, now use database) ---
+# def load_chat_history():
+#     if os.path.exists(CHAT_HISTORY_FILE):
+#         try:
+#             with open(CHAT_HISTORY_FILE, 'r', encoding='utf-8') as f:
+#                 return json.load(f)
+#         except json.JSONDecodeError:
+#             st.error(f"Error reading chat history file '{CHAT_HISTORY_FILE}'. File might be corrupted.")
+#             return []
+#     return []
 
 
-def save_chat_history(messages):
-    try:
-        with open(CHAT_HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(messages, f, ensure_ascii=False, indent=4)
-    except IOError as e:
-        st.error(f"Error saving chat history: {e}")
+# def save_chat_history(messages):
+#     try:
+#         with open(CHAT_HISTORY_FILE, 'w', encoding='utf-8') as f:
+#             json.dump(messages, f, ensure_ascii=False, indent=4)
+#     except IOError as e:
+#         st.error(f"Error saving chat history: {e}")
 
 
 def asktoai(user_input, system_prompt_content, conversation_history, model_option, max_tokens_val, top_p_val):
@@ -100,6 +102,22 @@ def asktoai(user_input, system_prompt_content, conversation_history, model_optio
 st.set_page_config(page_title="百家饭AI", layout="wide")
 st.title("百家饭AI")
 
+# Check authentication status first
+if not st.session_state.get("authenticated"):
+    auth.show_login_page() # Redirect to login if not authenticated
+    st.stop() # Stop further execution of this script until authenticated
+
+# Retrieve current user's ID
+# Assuming 'username' is stored in session_state after successful login
+current_username = st.session_state.get('username')
+current_user = database.get_user_by_username(current_username)
+current_user_id = current_user['id'] if current_user else None
+
+if not current_user_id:
+    st.error("无法获取当前用户信息，请尝试重新登录。")
+    st.stop()
+
+
 # Sidebar for settings
 with st.sidebar:
     st.header("⚙️ 设置")
@@ -139,10 +157,13 @@ with st.sidebar:
     )
 
 
-
 if 'messages' not in st.session_state:
     if not st.session_state.get('messages'):
         st.session_state.messages = []
+# Initialize session state for the current model in use for saving
+if 'current_session_model' not in st.session_state:
+    st.session_state.current_session_model = model_selected
+
 
 for i, msg_content in enumerate(st.session_state.messages):
     role_name = "human" if i % 2 == 0 else "ai"
@@ -152,6 +173,12 @@ for i, msg_content in enumerate(st.session_state.messages):
 user_chat_input = st.chat_input("您好，请问有什么可以帮助您的？")
 
 if user_chat_input:
+    # Update the model used for the current session if it changed
+    # Only if there are no messages yet, or if we decide to allow changing mid-session
+    # For now, let's assume if a new chat input comes, we use the currently selected model
+    if not st.session_state.messages or st.session_state.current_session_model != model_selected:
+        st.session_state.current_session_model = model_selected
+
     with st.chat_message("human"):
         st.markdown(user_chat_input)
     history_for_api = list(st.session_state.messages)
@@ -177,9 +204,14 @@ if user_chat_input:
 st.markdown("---", unsafe_allow_html=True)
 if st.button("💾 保存聊天记录并开始新对话", help="保存当前对话到本地文件，并清空当前聊天界面。"):
     if st.session_state.messages:
-        save_chat_history(st.session_state.messages)
-        st.success(f"聊天记录已保存到 {CHAT_HISTORY_FILE}！将开始新的对话。")
-        st.session_state.messages = []
-        st.rerun()
+        # Pass the current_user_id, the model used for this session, and messages to the database function
+        success = database.save_chat_session(current_user_id, st.session_state.current_session_model, st.session_state.messages)
+        if success:
+            st.success("聊天记录已保存到数据库！将开始新的对话。")
+            st.session_state.messages = []
+            st.session_state.current_session_model = model_selected # Reset model for new session
+            st.rerun()
+        else:
+            st.error("保存聊天记录到数据库失败。")
     else:
         st.info("当前没有聊天记录可保存。")
